@@ -73,8 +73,7 @@
             <button id="downloadBtn" class="small-btn">Download</button>
             <button id="makeShareBtn" class="small-btn primary">Buat Shareable URL</button>
             <button id="copyShareBtn" class="small-btn">Copy Share URL</button>
-            <button id="shrinkBtn" class="small-btn primary">Shrink URL</button>
-            <button id="copyShortBtn" class="small-btn">Copy Short URL</button>
+            
             <button id="downloadShareBtn" class="small-btn">Download Share Page</button>
           </div>
           <div class="hint" id="fileInfo"></div>
@@ -104,8 +103,8 @@
           <div class="hint">
             - Data URL bisa sangat besar untuk file besar.<br>
             - Shareable URL menyimpan Data URL di bagian fragment (hash), jadi tidak dikirim ke server.<br>
-            - <strong>Shrink URL</strong> mencoba layanan TinyURL, is.gd, atau v.gd untuk membuat link pendek.<br>
-            - Jika auto-shrink gagal (CORS/URL terlalu panjang), gunakan tinyurl.com atau bit.ly secara manual.<br>
+            - Upload sekarang menggunakan GitHub Release asset (binary) untuk file asli; tidak perlu base64.<br>
+            - Jika Anda ingin halaman statis (GitHub Pages path), gunakan tombol Download Share Page lalu publish ke repo.
             - Beberapa format (mis. .docx) tidak bisa ditampilkan langsung di browser — gunakan download.
           </div>
         </div>
@@ -130,8 +129,6 @@
     const downloadBtn = document.getElementById('downloadBtn');
   const makeShareBtn = document.getElementById('makeShareBtn');
   const copyShareBtn = document.getElementById('copyShareBtn');
-  const shrinkBtn = document.getElementById('shrinkBtn');
-  const copyShortBtn = document.getElementById('copyShortBtn');
   const downloadShareBtn = document.getElementById('downloadShareBtn');
   const ghOwnerInput = document.getElementById('ghOwnerInput');
   const ghRepoInput = document.getElementById('ghRepoInput');
@@ -140,11 +137,11 @@
   const publishBtn = document.getElementById('publishBtn');
   const publishStatus = document.getElementById('publishStatus');
 
-    let currentDataUrl = '';
-    let currentFileName = 'file.bin';
-    let currentMime = '';
-    let currentShareUrl = '';
-    let currentShortUrl = '';
+  let currentDataUrl = '';
+  let currentFile = null;
+  let currentFileName = 'file.bin';
+  let currentMime = '';
+  let currentShareUrl = '';
 
     // Drag & Drop
     dropzone.addEventListener('click', ()=> fileInput.click());
@@ -174,6 +171,7 @@
     });
 
     function handleFile(file){
+      currentFile = file;
       currentFileName = file.name || 'file.bin';
       currentMime = file.type || 'application/octet-stream';
       fileInfo.textContent = `${currentFileName} • ${currentMime} • ${humanSize(file.size)}`;
@@ -219,9 +217,7 @@
   dataUrlField.value = dataUrl;
   base64Area.value = payload;
   currentShareUrl = ''; // invalidate until made
-  currentShortUrl = ''; // invalidate short URL too
   copyShareBtn.disabled = true;
-  copyShortBtn.disabled = true;
   if (downloadShareBtn) downloadShareBtn.disabled = true;
 
       // Clean up previous blob URL if exists
@@ -298,13 +294,12 @@
       }
 
   // enable buttons
-      openBtn.disabled = false;
-      copyDataBtn.disabled = false;
-      copyBaseBtn.disabled = false;
-      downloadBtn.disabled = false;
-      makeShareBtn.disabled = false;
-  shrinkBtn.disabled = false;
-  if (downloadShareBtn) downloadShareBtn.disabled = false;
+    openBtn.disabled = false;
+    copyDataBtn.disabled = false;
+    copyBaseBtn.disabled = false;
+    downloadBtn.disabled = false;
+    makeShareBtn.disabled = false;
+    if (downloadShareBtn) downloadShareBtn.disabled = false;
     }
 
     openBtn.addEventListener('click', ()=>{
@@ -375,87 +370,7 @@
       }
     });
 
-    shrinkBtn.addEventListener('click', async ()=>{
-      if (!currentShareUrl) return alert('Buat Shareable URL dahulu sebelum shrink');
-      
-      shrinkBtn.disabled = true;
-      shrinkBtn.textContent = 'Shrinking...';
-      
-      try {
-        // Try multiple URL shortener services
-        let shortUrl = null;
-        
-        // Try 1: TinyURL API (more reliable with CORS)
-        try {
-          const tinyResponse = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(currentShareUrl)}`);
-          if (tinyResponse.ok) {
-            shortUrl = await tinyResponse.text();
-            if (shortUrl && shortUrl.startsWith('http')) {
-              console.log('TinyURL success:', shortUrl);
-            } else {
-              shortUrl = null;
-            }
-          }
-        } catch(e) {
-          console.log('TinyURL failed, trying next...', e);
-        }
-        
-        // Try 2: is.gd API
-        if (!shortUrl) {
-          try {
-            const isgdResponse = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(currentShareUrl)}`);
-            const isgdData = await isgdResponse.json();
-            if (isgdData.shorturl) {
-              shortUrl = isgdData.shorturl;
-              console.log('is.gd success:', shortUrl);
-            }
-          } catch(e) {
-            console.log('is.gd failed, trying next...', e);
-          }
-        }
-        
-        // Try 3: v.gd API (similar to is.gd)
-        if (!shortUrl) {
-          try {
-            const vgdResponse = await fetch(`https://v.gd/create.php?format=json&url=${encodeURIComponent(currentShareUrl)}`);
-            const vgdData = await vgdResponse.json();
-            if (vgdData.shorturl) {
-              shortUrl = vgdData.shorturl;
-              console.log('v.gd success:', shortUrl);
-            }
-          } catch(e) {
-            console.log('v.gd failed', e);
-          }
-        }
-        
-        if (shortUrl) {
-          currentShortUrl = shortUrl;
-          copyShortBtn.disabled = false;
-          shrinkBtn.textContent = 'Shrink URL ✓';
-          alert('Short URL berhasil dibuat!\n\n' + currentShortUrl);
-          setTimeout(()=> shrinkBtn.textContent = 'Shrink URL', 2000);
-        } else {
-          throw new Error('Semua layanan shortener gagal. Mungkin karena CORS policy atau URL terlalu panjang.');
-        }
-      } catch(e) {
-        console.error('Shrink URL error:', e);
-        alert('Error membuat short URL: ' + e.message + '\n\nAlternatif:\n1. Copy Share URL dan buka tinyurl.com atau bit.ly\n2. Paste URL di sana untuk membuat short URL manual');
-        shrinkBtn.textContent = 'Shrink URL';
-      } finally {
-        shrinkBtn.disabled = false;
-      }
-    });
-
-    copyShortBtn.addEventListener('click', async ()=>{
-      if (!currentShortUrl) return alert('Belum membuat short URL, klik "Shrink URL" dahulu');
-      try {
-        await navigator.clipboard.writeText(currentShortUrl);
-        copyShortBtn.textContent = 'Copied ✓';
-        setTimeout(()=> copyShortBtn.textContent = 'Copy Short URL', 1500);
-      } catch(e) {
-        alert('Gagal copy: ' + e);
-      }
-    });
+    
 
     // Helper: generate share HTML
     function generateShareHtml(){
@@ -483,45 +398,54 @@
       }
     });
 
-    // Publish to GitHub Pages: client-side via GitHub REST API (user-provided token)
+    // Publish to GitHub: prefer binary upload via Release asset (no base64)
     publishBtn.addEventListener('click', async ()=>{
-      if (!currentDataUrl) return alert('Belum ada file untuk dibuat halaman share');
+      if (!currentDataUrl && !currentFile) return alert('Belum ada file untuk diupload');
       const owner = (ghOwnerInput.value || '').trim();
       const repo = (ghRepoInput.value || '').trim();
       const token = (ghTokenInput.value || '').trim();
-      const branch = (ghBranchInput.value || 'main').trim() || 'main';
       if (!owner || !repo || !token) return alert('Isi owner, repo, dan token GitHub (token tidak disimpan).');
-      if (!confirm('Token hanya digunakan sekali untuk meng-commit file ke repo Anda. Token tidak disimpan. Lanjutkan?')) return;
+      if (!confirm('Token hanya digunakan sekali untuk membuat release dan mengupload asset ke repo Anda. Token tidak disimpan. Lanjutkan?')) return;
 
       publishStatus.textContent = 'Mempublish...';
       publishBtn.disabled = true;
       try {
-        const { html, safeName } = generateShareHtml();
-        // encode utf8 -> base64
-        const base64 = btoa(unescape(encodeURIComponent(html)));
-        const path = `share-${safeName}.html`;
-        const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURIComponent(path)}`;
-        const body = {
-          message: `Add share page ${path}`,
-          content: base64,
-          branch: branch
-        };
-        const res = await fetch(apiUrl, {
-          method: 'PUT',
-          headers: {
-            'Authorization': 'token ' + token,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(body)
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          console.error('GitHub API error', data);
-          throw new Error(data.message || JSON.stringify(data));
+        // Determine upload blob: prefer original file blob, otherwise generate share HTML blob
+        let uploadBlob = null;
+        let uploadName = '';
+        if (currentFile) {
+          uploadBlob = currentFile;
+          uploadName = currentFile.name || ('file-' + Date.now());
+        } else {
+          const { html, safeName } = generateShareHtml();
+          uploadBlob = new Blob([html], { type: 'text/html' });
+          uploadName = `share-${safeName}.html`;
         }
-        // Success
-        const ghUrl = `https://${owner}.github.io/${repo}/${path}`;
-        publishStatus.innerHTML = `Published: <a href="${ghUrl}" target="_blank" rel="noopener">${ghUrl}</a>`;
+
+        // Create a release
+        publishStatus.textContent = 'Creating release...';
+        const tag = `share-${Date.now()}`;
+        const releaseRes = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/releases`, {
+          method: 'POST',
+          headers: { 'Authorization': 'token ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tag_name: tag, name: `Share ${uploadName}`, draft: false, prerelease: false })
+        });
+        const releaseData = await releaseRes.json();
+        if (!releaseRes.ok) throw new Error(releaseData.message || JSON.stringify(releaseData));
+
+        // Upload asset
+        publishStatus.textContent = 'Uploading asset...';
+        const uploadUrlTemplate = releaseData.upload_url; // e.g. https://uploads.github.com/...{?name,label}
+        const uploadUrl = uploadUrlTemplate.split('{')[0] + `?name=${encodeURIComponent(uploadName)}`;
+        const assetRes = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: { 'Authorization': 'token ' + token, 'Content-Type': uploadBlob.type || 'application/octet-stream' },
+          body: uploadBlob
+        });
+        const assetData = await assetRes.json();
+        if (!assetRes.ok) throw new Error(assetData.message || JSON.stringify(assetData));
+
+        publishStatus.innerHTML = `Uploaded asset: <a href="${assetData.browser_download_url}" target="_blank">${assetData.browser_download_url}</a>`;
       } catch(e) {
         console.error('Publish error', e);
         publishStatus.textContent = 'Error: ' + (e.message || e);
