@@ -75,6 +75,8 @@
             <button id="copyShareBtn" class="small-btn">Copy Share URL</button>
             <button id="shrinkBtn" class="small-btn primary">Shrink URL</button>
             <button id="copyShortBtn" class="small-btn">Copy Short URL</button>
+            <button id="downloadShareBtn" class="small-btn">Download Share Page</button>
+            <button id="copyGitBtn" class="small-btn">Copy Git Cmds</button>
           </div>
           <div class="hint" id="fileInfo"></div>
         </div>
@@ -116,10 +118,12 @@
     const copyDataBtn = document.getElementById('copyDataBtn');
     const copyBaseBtn = document.getElementById('copyBaseBtn');
     const downloadBtn = document.getElementById('downloadBtn');
-    const makeShareBtn = document.getElementById('makeShareBtn');
-    const copyShareBtn = document.getElementById('copyShareBtn');
-    const shrinkBtn = document.getElementById('shrinkBtn');
-    const copyShortBtn = document.getElementById('copyShortBtn');
+  const makeShareBtn = document.getElementById('makeShareBtn');
+  const copyShareBtn = document.getElementById('copyShareBtn');
+  const shrinkBtn = document.getElementById('shrinkBtn');
+  const copyShortBtn = document.getElementById('copyShortBtn');
+  const downloadShareBtn = document.getElementById('downloadShareBtn');
+  const copyGitBtn = document.getElementById('copyGitBtn');
 
     let currentDataUrl = '';
     let currentFileName = 'file.bin';
@@ -197,12 +201,14 @@
       }
       
       // update fields
-      dataUrlField.value = dataUrl;
-      base64Area.value = payload;
-      currentShareUrl = ''; // invalidate until made
-      currentShortUrl = ''; // invalidate short URL too
-      copyShareBtn.disabled = true;
-      copyShortBtn.disabled = true;
+  dataUrlField.value = dataUrl;
+  base64Area.value = payload;
+  currentShareUrl = ''; // invalidate until made
+  currentShortUrl = ''; // invalidate short URL too
+  copyShareBtn.disabled = true;
+  copyShortBtn.disabled = true;
+  if (downloadShareBtn) downloadShareBtn.disabled = true;
+  if (copyGitBtn) copyGitBtn.disabled = true;
 
       // Clean up previous blob URL if exists
       if (window.currentPdfBlobUrl) {
@@ -277,13 +283,15 @@
         previewArea.appendChild(div);
       }
 
-      // enable buttons
+  // enable buttons
       openBtn.disabled = false;
       copyDataBtn.disabled = false;
       copyBaseBtn.disabled = false;
       downloadBtn.disabled = false;
       makeShareBtn.disabled = false;
-      shrinkBtn.disabled = false;
+  shrinkBtn.disabled = false;
+  if (downloadShareBtn) downloadShareBtn.disabled = false;
+  if (copyGitBtn) copyGitBtn.disabled = false;
     }
 
     openBtn.addEventListener('click', ()=>{
@@ -433,6 +441,54 @@
         setTimeout(()=> copyShortBtn.textContent = 'Copy Short URL', 1500);
       } catch(e) {
         alert('Gagal copy: ' + e);
+      }
+    });
+
+    // Download a small HTML page that redirects to the data URL (useful for hosting as a static file)
+    downloadShareBtn.addEventListener('click', ()=>{
+      if (!currentDataUrl) return alert('Belum ada file untuk dibuat halaman share');
+      try {
+        // sanitize filename
+        const safeName = (currentFileName || 'shared').replace(/[^a-zA-Z0-9._-]/g, '_');
+        const html = `<!doctype html>\n<html lang="en">\n<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shared file</title></head>\n<body>Loading...<script>\n  try{\n    const dataUrl = ${JSON.stringify(currentDataUrl)};\n    // navigate to the data URL to display/download\n    window.location.replace(dataUrl);\n  }catch(e){\n    document.body.innerHTML = '<pre style="white-space:pre-wrap;word-break:break-word;font-family:monospace">Error opening file: '+e+"\n\nData URL:\n"+${JSON.stringify(currentDataUrl)}+'</pre>';
+  }\n<\/script></body>\n</html>`;
+
+        const blob = new Blob([html], {type: 'text/html'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `share-${safeName}.html`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(()=> URL.revokeObjectURL(url), 60000);
+      } catch(e) {
+        alert('Gagal membuat halaman share: ' + e);
+      }
+    });
+
+    // Copy Git commands for adding the downloaded share page to your GitHub Pages repo
+    copyGitBtn.addEventListener('click', async ()=>{
+      if (!currentDataUrl) return alert('Buat Shareable URL dahulu agar filename tersedia');
+      try {
+        const safeName = (currentFileName || 'shared').replace(/[^a-zA-Z0-9._-]/g, '_');
+        const filename = `share-${safeName}.html`;
+        const commands = `# From your local machine (WSL)
+# Move the downloaded file into your repo (example assumes Downloads folder)
+cp ~/Downloads/${filename} .
+# Or move the file into the repo folder using your file manager, then run:
+git add ${filename}
+git commit -m "Add shared file ${filename}"
+git push origin main
+
+# After push, GitHub Pages will serve it at:
+# https://<your-username>.github.io/<your-repo>/${filename}`;
+
+        await navigator.clipboard.writeText(commands);
+        copyGitBtn.textContent = 'Copied ✓';
+        setTimeout(()=> copyGitBtn.textContent = 'Copy Git Cmds', 2000);
+      } catch(e) {
+        alert('Gagal copy command: ' + e);
       }
     });
 
