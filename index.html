@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Data URL / Base64 Viewer</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--accent:#06b6d4;--muted:#94a3b8;--glass:rgba(255,255,255,0.03)}
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;color:#e6eef6;background:linear-gradient(180deg,#071025 0%, #081229 60%);-webkit-font-smoothing:antialiased}
+    .wrap{max-width:980px;margin:28px auto;padding:20px;background:var(--card);border-radius:12px;box-shadow:0 6px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.03)}
+    h1{margin:0 0 10px;font-size:20px}
+    p.lead{margin:0 0 18px;color:var(--muted);font-size:13px}
+    .controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+    .drop{flex:1;min-height:120px;padding:14px;border-radius:8px;border:2px dashed rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;text-align:center;background:var(--glass);cursor:pointer}
+    .drop.dragover{border-color:var(--accent);box-shadow:0 6px 18px rgba(6,182,212,0.06)}
+    .small{font-size:13px;color:var(--muted)}
+    input[type=file]{display:none}
+    .row{display:flex;gap:12px}
+    .col{flex:1;min-width:0}
+    .actions{display:flex;gap:8px}
+    button{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:#e6eef6;cursor:pointer}
+    button.primary{background:linear-gradient(90deg,var(--accent),#60a5fa);border:none;color:#042027}
+    .field{margin-top:12px}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input[type=text], textarea{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#e6eef6;font-size:13px;box-sizing:border-box}
+    textarea{height:120px;resize:vertical;font-family:monospace}
+    .preview{margin-top:12px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:10px;border:1px solid rgba(255,255,255,0.02)}
+    .preview img{max-width:100%;height:auto;border-radius:6px;display:block}
+    embed, iframe{width:100%;height:600px;border:0;border-radius:6px}
+    pre{white-space:pre-wrap;word-break:break-word;font-family:monospace;font-size:13px;color:#dbeafe}
+    .meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px}
+    .hint{font-size:12px;color:var(--muted)}
+    .footer{margin-top:16px;font-size:12px;color:var(--muted)}
+    .small-btn{padding:6px 8px;font-size:13px}
+    .danger{color:#f87171}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Data URL / Base64 Viewer</h1>
+    <p class="lead">Upload gambar atau file, konversi ke Data URL (base64), dan dapatkan URL yang bisa dibagikan langsung. Murni HTML + JS + CSS.</p>
+
+    <div class="controls">
+      <label class="drop" id="dropzone">
+        <div>
+          <strong id="drop-title">Klik atau tarik file ke sini</strong>
+          <div class="small" id="drop-sub">(images, pdf, text, docs — preview terbaik untuk image & pdf)</div>
+        </div>
+        <input id="fileInput" type="file" />
+      </label>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <div class="field">
+          <label>Data URL (full)</label>
+          <input type="text" id="dataUrlField" readonly />
+        </div>
+
+        <div class="field">
+          <label>Base64 (payload saja)</label>
+          <textarea id="base64Area" readonly placeholder="Base64 akan tampil di sini (payload saja)"></textarea>
+        </div>
+
+        <div class="meta">
+          <div class="actions">
+            <button id="openBtn" class="small-btn">Buka di tab baru</button>
+            <button id="copyDataBtn" class="small-btn">Copy Data URL</button>
+            <button id="copyBaseBtn" class="small-btn">Copy Base64</button>
+            <button id="downloadBtn" class="small-btn">Download</button>
+            <button id="makeShareBtn" class="small-btn primary">Buat Shareable URL</button>
+            <button id="copyShareBtn" class="small-btn">Copy Share URL</button>
+          </div>
+          <div class="hint" id="fileInfo"></div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="field">
+          <label>Preview</label>
+          <div class="preview" id="previewArea">
+            <div class="hint" id="previewHint">Belum ada file.</div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Catatan</label>
+          <div class="hint">
+            - Data URL bisa sangat besar untuk file besar.<br>
+            - Shareable URL menyimpan Data URL di bagian fragment (hash), jadi tidak dikirim ke server.<br>
+            - Beberapa format (mis. .docx) tidak bisa ditampilkan langsung di browser — gunakan download.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">Made simple — rahadiana</div>
+  </div>
+
+  <script>
+    // Elemen
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const dataUrlField = document.getElementById('dataUrlField');
+    const base64Area = document.getElementById('base64Area');
+    const previewArea = document.getElementById('previewArea');
+    const previewHint = document.getElementById('previewHint');
+    const fileInfo = document.getElementById('fileInfo');
+    const openBtn = document.getElementById('openBtn');
+    const copyDataBtn = document.getElementById('copyDataBtn');
+    const copyBaseBtn = document.getElementById('copyBaseBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const makeShareBtn = document.getElementById('makeShareBtn');
+    const copyShareBtn = document.getElementById('copyShareBtn');
+
+    let currentDataUrl = '';
+    let currentFileName = 'file.bin';
+    let currentMime = '';
+    let currentShareUrl = '';
+
+    // Drag & Drop
+    dropzone.addEventListener('click', ()=> fileInput.click());
+    ;['dragenter','dragover'].forEach(e=> dropzone.addEventListener(e, (ev)=>{ ev.preventDefault(); ev.stopPropagation(); dropzone.classList.add('dragover'); }));
+    ;['dragleave','drop'].forEach(e=> dropzone.addEventListener(e, (ev)=>{ ev.preventDefault(); ev.stopPropagation(); dropzone.classList.remove('dragover'); }));
+    dropzone.addEventListener('drop', (ev)=>{
+      const f = ev.dataTransfer.files && ev.dataTransfer.files[0];
+      if (f) handleFile(f);
+    });
+
+    fileInput.addEventListener('change', (ev)=>{
+      if (ev.target.files && ev.target.files[0]) handleFile(ev.target.files[0]);
+    });
+
+    // On load, if there's a hash with data URL, show it
+    window.addEventListener('load', ()=>{
+      if (location.hash && location.hash.length > 1) {
+        try {
+          const dataUrl = decodeURIComponent(location.hash.slice(1));
+          if (dataUrl.startsWith('data:')) {
+            showFromDataUrl(dataUrl, 'from-share');
+          }
+        } catch(e) {
+          console.warn('Cant decode hash', e);
+        }
+      }
+    });
+
+    function handleFile(file){
+      currentFileName = file.name || 'file.bin';
+      currentMime = file.type || 'application/octet-stream';
+      fileInfo.textContent = `${currentFileName} • ${currentMime} • ${humanSize(file.size)}`;
+      const reader = new FileReader();
+      reader.onload = (e)=>{
+        const dataUrl = e.target.result; // already data:[mime];base64,...
+        showFromDataUrl(dataUrl, file);
+      };
+      // use readAsDataURL to get base64 data URL
+      reader.readAsDataURL(file);
+    }
+
+    function showFromDataUrl(dataUrl, file){
+      currentDataUrl = dataUrl;
+      // split payload
+      const comma = dataUrl.indexOf(',');
+      const meta = dataUrl.substring(5, comma); // after "data:"
+      const payload = dataUrl.substring(comma + 1);
+      // update fields
+      dataUrlField.value = dataUrl;
+      base64Area.value = payload;
+      currentShareUrl = ''; // invalidate until made
+      copyShareBtn.disabled = true;
+
+      // Set preview
+      previewArea.innerHTML = '';
+      previewHint.textContent = '';
+      // try to detect mime from meta
+      let mime = '';
+      if (meta.indexOf(';') !== -1) mime = meta.split(';')[0]; else mime = meta;
+      if (!mime) mime = currentMime || '';
+
+      // Image
+      if (mime.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.alt = currentFileName;
+        previewArea.appendChild(img);
+      } else if (mime === 'application/pdf') {
+        const embed = document.createElement('embed');
+        embed.type = 'application/pdf';
+        embed.src = dataUrl;
+        previewArea.appendChild(embed);
+      } else if (mime.startsWith('text/') || mime === 'application/json' || mime.endsWith('+xml')) {
+        // show text content
+        // decode base64 to text
+        try {
+          const decoded = atob(payload);
+          // try to UTF-8 decode
+          const text = utf8Decode(decoded);
+          const pre = document.createElement('pre');
+          pre.textContent = text;
+          previewArea.appendChild(pre);
+        } catch(e) {
+          const pre = document.createElement('pre');
+          pre.textContent = '[Gagal decode text preview]';
+          previewArea.appendChild(pre);
+        }
+      } else {
+        const div = document.createElement('div');
+        div.className = 'hint';
+        div.innerHTML = `Preview tidak tersedia untuk MIME <strong>${mime || 'unknown'}</strong>. Gunakan tombol Download.`;
+        previewArea.appendChild(div);
+      }
+
+      // enable buttons
+      openBtn.disabled = false;
+      copyDataBtn.disabled = false;
+      copyBaseBtn.disabled = false;
+      downloadBtn.disabled = false;
+      makeShareBtn.disabled = false;
+    }
+
+    openBtn.addEventListener('click', ()=>{
+      if (!currentDataUrl) return alert('Belum ada data URL');
+      window.open(currentDataUrl, '_blank');
+    });
+
+    copyDataBtn.addEventListener('click', async ()=>{
+      if (!currentDataUrl) return;
+      try {
+        await navigator.clipboard.writeText(currentDataUrl);
+        copyDataBtn.textContent = 'Copied ✓';
+        setTimeout(()=> copyDataBtn.textContent = 'Copy Data URL', 1500);
+      } catch(e) {
+        alert('Gagal copy: ' + e);
+      }
+    });
+
+    copyBaseBtn.addEventListener('click', async ()=>{
+      if (!base64Area.value) return;
+      try {
+        await navigator.clipboard.writeText(base64Area.value);
+        copyBaseBtn.textContent = 'Copied ✓';
+        setTimeout(()=> copyBaseBtn.textContent = 'Copy Base64', 1500);
+      } catch(e) {
+        alert('Gagal copy: ' + e);
+      }
+    });
+
+    downloadBtn.addEventListener('click', ()=>{
+      if (!currentDataUrl) return;
+      const a = document.createElement('a');
+      a.href = currentDataUrl;
+      a.download = currentFileName || 'download.bin';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+
+    makeShareBtn.addEventListener('click', ()=>{
+      if (!currentDataUrl) return;
+      // create a URL with the data url in the fragment (hash) — so it won't be sent to server
+      try {
+        currentShareUrl = location.origin + location.pathname + '#' + encodeURIComponent(currentDataUrl);
+      } catch(e) {
+        // fallback: base64 payload only
+        currentShareUrl = location.origin + location.pathname + '#data:' + encodeURIComponent(currentDataUrl);
+      }
+      copyShareBtn.disabled = false;
+      // update UI
+      makeShareBtn.textContent = 'Share URL dibuat';
+      setTimeout(()=> makeShareBtn.textContent = 'Buat Shareable URL', 1500);
+    });
+
+    copyShareBtn.addEventListener('click', async ()=>{
+      if (!currentShareUrl) return alert('Belum membuat share URL, klik "Buat Shareable URL" dahulu');
+      try {
+        await navigator.clipboard.writeText(currentShareUrl);
+        copyShareBtn.textContent = 'Copied ✓';
+        setTimeout(()=> copyShareBtn.textContent = 'Copy Share URL', 1500);
+      } catch(e) {
+        alert('Gagal copy: ' + e);
+      }
+    });
+
+    // Helpers
+    function humanSize(bytes){
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+      if (bytes < 1024*1024*1024) return (bytes/(1024*1024)).toFixed(2) + ' MB';
+      return (bytes/(1024*1024*1024)).toFixed(2) + ' GB';
+    }
+
+    // atob result is binary string; we try to decode as UTF-8
+    function utf8Decode(binStr){
+      try {
+        // convert binary string to Uint8Array
+        const len = binStr.length;
+        const bytes = new Uint8Array(len);
+        for (let i=0;i<len;i++) bytes[i] = binStr.charCodeAt(i);
+        const dec = new TextDecoder(); // utf-8
+        return dec.decode(bytes);
+      } catch(e){
+        // fallback
+        return binStr;
+      }
+    }
+
+  </script>
+</body>
+</html>
