@@ -96,6 +96,10 @@
                     type="password"
                     placeholder="Paste Personal Access Token (repo scope)"
                     style="width:360px"/>
+                <select id="uploadMethod" style="width:240px">
+                    <option value="commit">Commit to repo (base64, appears in repo)</option>
+                    <option value="release">Create Release & upload asset (binary, no base64)</option>
+                </select>
                 <button id="publishBtn" class="primary">Publish</button>
             </div>
             <div id="publishStatus" class="muted"></div>
@@ -156,6 +160,7 @@
             const tokenExInput = document.getElementById('tokenExUrl');
             const startOauth = document.getElementById('startOauth');
             const oauthInfo = document.getElementById('oauthInfo');
+            const uploadMethod = document.getElementById('uploadMethod');
 
             let currentFile = null;
             let currentDataUrl = '';
@@ -209,8 +214,16 @@
                     const str = currentDataUrl;
                     const utf8 = new TextEncoder().encode(str);
                     const def = pako.deflate(utf8);
-                    // base64 encode
-                    const b64 = btoa(String.fromCharCode.apply(null, Array.from(def)));
+                            // base64 encode (safe for large arrays)
+                            function uint8ToBase64(u8){
+                                const CHUNK_SIZE = 0x8000; // arbitrary chunk size to avoid stack limits
+                                let chunks = [];
+                                for (let i=0;i<u8.length;i+=CHUNK_SIZE){
+                                    chunks.push(String.fromCharCode.apply(null, u8.subarray(i, i+CHUNK_SIZE)));
+                                }
+                                return btoa(chunks.join(''));
+                            }
+                            const b64 = uint8ToBase64(def);
                     // share HTML includes pako and code to decode and inflate
                     const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeName}</title></head><body>Loading...<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"><\/script><script>try{const b64=${JSON.stringify(
                         b64
@@ -264,6 +277,49 @@
                     const compress = !!compressToggle.checked;
                     const {html, safeName} = generateShareHtml(compress);
                     const path = `share-${safeName}.html`;
+                    const method = (uploadMethod && uploadMethod.value) || 'commit';
+
+                    if (method === 'release') {
+                        // Upload original file as a release asset (binary) — avoids base64
+                        if (!currentFile) {
+                            publishStatus.textContent = 'No original file selected for release upload';
+                            publishBtn.disabled = false;
+                            return;
+                        }
+                        if (!token) {
+                            publishStatus.textContent = 'Token required for release creation';
+                            publishBtn.disabled = false;
+                            return;
+                        }
+                        try {
+                            publishStatus.textContent = 'Creating release...';
+                            const tag = `share-${Date.now()}`;
+                            const releaseRes = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/releases`, {
+                                method: 'POST',
+                                headers: { 'Authorization': 'token ' + token, 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ tag_name: tag, name: `Share ${safeName}`, draft: false, prerelease: false })
+                            });
+                            const releaseData = await releaseRes.json();
+                            if (!releaseRes.ok) throw new Error(releaseData.message || JSON.stringify(releaseData));
+                            const uploadUrlTemplate = releaseData.upload_url;
+                            const uploadUrl = uploadUrlTemplate.split('{')[0] + `?name=${encodeURIComponent(currentFile.name || ('upload-' + Date.now()))}`;
+                            publishStatus.textContent = 'Uploading asset...';
+                            const assetRes = await fetch(uploadUrl, {
+                                method: 'POST',
+                                headers: { 'Authorization': 'token ' + token, 'Content-Type': currentFile.type || 'application/octet-stream' },
+                                body: currentFile
+                            });
+                            const assetData = await assetRes.json();
+                            if (!assetRes.ok) throw new Error(assetData.message || JSON.stringify(assetData));
+                            publishStatus.innerHTML = `Uploaded release asset: <a href="${assetData.browser_download_url}" target="_blank">${assetData.browser_download_url}</a>`;
+                        } catch (e) {
+                            console.error('Release upload failed', e);
+                            publishStatus.textContent = 'Release upload failed: ' + (e.message || e);
+                        } finally {
+                            publishBtn.disabled = false;
+                        }
+                        return;
+                    }
 
                     // pre-check GET
                     publishStatus.textContent = 'Checking if file exists...';
