@@ -37,7 +37,7 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>Data URL / Base64 Viewer</h1>
+    <a href="https://github.com/rahadiana/data_encode_viewer" target="_blank" rel="noopener noreferrer"><h1>Data URL / Base64 Viewer</h1></a>
     <p class="lead">Upload gambar atau file, konversi ke Data URL (base64), dan dapatkan URL yang bisa dibagikan langsung. Murni HTML + JS + CSS.</p>
 
     <div class="controls">
@@ -163,18 +163,44 @@
       const comma = dataUrl.indexOf(',');
       const meta = dataUrl.substring(5, comma); // after "data:"
       const payload = dataUrl.substring(comma + 1);
+      
+      // Extract mime from data URL
+      let mime = '';
+      if (meta.indexOf(';') !== -1) mime = meta.split(';')[0]; else mime = meta;
+      
+      // If file is provided (from upload), use its info
+      if (file && typeof file === 'object' && file.name) {
+        currentFileName = file.name || 'file.bin';
+        currentMime = file.type || mime || 'application/octet-stream';
+        fileInfo.textContent = `${currentFileName} • ${currentMime} • ${humanSize(file.size)}`;
+      } else {
+        // From share URL - extract info from data URL
+        currentMime = mime || 'application/octet-stream';
+        // Try to guess filename from mime
+        let ext = 'bin';
+        if (mime.startsWith('image/')) ext = mime.split('/')[1] || 'png';
+        else if (mime === 'application/pdf') ext = 'pdf';
+        else if (mime.startsWith('text/')) ext = 'txt';
+        else if (mime === 'application/json') ext = 'json';
+        currentFileName = 'shared-file.' + ext;
+        fileInfo.textContent = `${currentFileName} • ${currentMime} • ${humanSize(payload.length * 0.75)} (perkiraan)`;
+      }
+      
       // update fields
       dataUrlField.value = dataUrl;
       base64Area.value = payload;
       currentShareUrl = ''; // invalidate until made
       copyShareBtn.disabled = true;
 
+      // Clean up previous blob URL if exists
+      if (window.currentPdfBlobUrl) {
+        URL.revokeObjectURL(window.currentPdfBlobUrl);
+        window.currentPdfBlobUrl = null;
+      }
+
       // Set preview
       previewArea.innerHTML = '';
       previewHint.textContent = '';
-      // try to detect mime from meta
-      let mime = '';
-      if (meta.indexOf(';') !== -1) mime = meta.split(';')[0]; else mime = meta;
       if (!mime) mime = currentMime || '';
 
       // Image
@@ -184,19 +210,39 @@
         img.alt = currentFileName;
         previewArea.appendChild(img);
       } else if (mime === 'application/pdf' || currentFileName.toLowerCase().endsWith('.pdf')) {
-        // Try iframe first (better compatibility)
-        const iframe = document.createElement('iframe');
-        iframe.src = dataUrl;
-        iframe.style.width = '100%';
-        iframe.style.height = '600px';
-        iframe.style.border = 'none';
-        iframe.style.borderRadius = '6px';
-        previewArea.appendChild(iframe);
-        
-        // Add error message if PDF doesn't load
-        iframe.onerror = function() {
-          previewArea.innerHTML = '<div class="hint">PDF tidak dapat ditampilkan di browser ini. Silakan gunakan tombol Download atau Buka di tab baru.</div>';
-        };
+        // Convert base64 to blob for better PDF support
+        try {
+          console.log('Creating PDF preview for:', currentFileName, 'MIME:', mime);
+          const blob = dataURLtoBlob(dataUrl);
+          console.log('Blob created:', blob.size, 'bytes');
+          const blobUrl = URL.createObjectURL(blob);
+          console.log('Blob URL created:', blobUrl);
+          
+          const object = document.createElement('object');
+          object.data = blobUrl;
+          object.type = 'application/pdf';
+          object.style.width = '100%';
+          object.style.height = '600px';
+          object.style.borderRadius = '6px';
+          
+          // Fallback content
+          object.innerHTML = `
+            <div class="hint" style="padding:20px;text-align:center;">
+              <p><strong>PDF Preview tidak tersedia di browser ini.</strong></p>
+              <p>Gunakan tombol <strong>"Buka di tab baru"</strong> atau <strong>"Download"</strong> untuk melihat PDF.</p>
+              <button onclick="window.open('${blobUrl}', '_blank')" style="margin-top:10px;padding:8px 16px;background:#06b6d4;border:none;border-radius:6px;color:#042027;cursor:pointer;font-weight:bold;">Buka PDF di Tab Baru</button>
+            </div>
+          `;
+          
+          previewArea.appendChild(object);
+          
+          // Store blob URL to prevent premature cleanup
+          window.currentPdfBlobUrl = blobUrl;
+          console.log('PDF preview loaded successfully');
+        } catch(e) {
+          console.error('PDF loading error:', e);
+          previewArea.innerHTML = '<div class="hint" style="padding:20px;color:#f87171;"><strong>Error loading PDF:</strong> ' + e.message + '<br><br>Gunakan tombol <strong>"Download"</strong> atau <strong>"Buka di tab baru"</strong> untuk melihat PDF.</div>';
+        }
       } else if (mime.startsWith('text/') || mime === 'application/json' || mime.endsWith('+xml')) {
         // show text content
         // decode base64 to text
@@ -229,7 +275,12 @@
 
     openBtn.addEventListener('click', ()=>{
       if (!currentDataUrl) return alert('Belum ada data URL');
-      window.open(currentDataUrl, '_blank');
+      // For PDF, use blob URL if available for better compatibility
+      if ((currentMime === 'application/pdf' || currentFileName.toLowerCase().endsWith('.pdf')) && window.currentPdfBlobUrl) {
+        window.open(window.currentPdfBlobUrl, '_blank');
+      } else {
+        window.open(currentDataUrl, '_blank');
+      }
     });
 
     copyDataBtn.addEventListener('click', async ()=>{
@@ -310,6 +361,33 @@
       } catch(e){
         // fallback
         return binStr;
+      }
+    }
+
+    // Convert Data URL to Blob (for better PDF support)
+    function dataURLtoBlob(dataUrl){
+      try {
+        const parts = dataUrl.split(',');
+        if (parts.length < 2) throw new Error('Invalid data URL format');
+        
+        // Extract mime type
+        let mime = 'application/octet-stream';
+        const mimeMatch = parts[0].match(/:(.*?);/);
+        if (mimeMatch && mimeMatch[1]) {
+          mime = mimeMatch[1];
+        }
+        
+        // Decode base64
+        const bstr = atob(parts[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while(n--){
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new Blob([u8arr], {type: mime});
+      } catch(e) {
+        console.error('Error converting data URL to blob:', e);
+        throw e;
       }
     }
 
