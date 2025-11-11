@@ -92,7 +92,8 @@
           <div class="hint">
             - Data URL bisa sangat besar untuk file besar.<br>
             - Shareable URL menyimpan Data URL di bagian fragment (hash), jadi tidak dikirim ke server.<br>
-            - <strong>Shrink URL</strong> menggunakan layanan is.gd untuk membuat link yang lebih pendek.<br>
+            - <strong>Shrink URL</strong> mencoba layanan TinyURL, is.gd, atau v.gd untuk membuat link pendek.<br>
+            - Jika auto-shrink gagal (CORS/URL terlalu panjang), gunakan tinyurl.com atau bit.ly secara manual.<br>
             - Beberapa format (mis. .docx) tidak bisa ditampilkan langsung di browser — gunakan download.
           </div>
         </div>
@@ -360,25 +361,64 @@
       shrinkBtn.textContent = 'Shrinking...';
       
       try {
-        // Use is.gd API to shorten URL
-        const apiUrl = `https://is.gd/create.php?format=json&url=${encodeURIComponent(currentShareUrl)}`;
-        const response = await fetch(apiUrl);
-        const data = await response.json();
+        // Try multiple URL shortener services
+        let shortUrl = null;
         
-        if (data.shorturl) {
-          currentShortUrl = data.shorturl;
+        // Try 1: TinyURL API (more reliable with CORS)
+        try {
+          const tinyResponse = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(currentShareUrl)}`);
+          if (tinyResponse.ok) {
+            shortUrl = await tinyResponse.text();
+            if (shortUrl && shortUrl.startsWith('http')) {
+              console.log('TinyURL success:', shortUrl);
+            } else {
+              shortUrl = null;
+            }
+          }
+        } catch(e) {
+          console.log('TinyURL failed, trying next...', e);
+        }
+        
+        // Try 2: is.gd API
+        if (!shortUrl) {
+          try {
+            const isgdResponse = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(currentShareUrl)}`);
+            const isgdData = await isgdResponse.json();
+            if (isgdData.shorturl) {
+              shortUrl = isgdData.shorturl;
+              console.log('is.gd success:', shortUrl);
+            }
+          } catch(e) {
+            console.log('is.gd failed, trying next...', e);
+          }
+        }
+        
+        // Try 3: v.gd API (similar to is.gd)
+        if (!shortUrl) {
+          try {
+            const vgdResponse = await fetch(`https://v.gd/create.php?format=json&url=${encodeURIComponent(currentShareUrl)}`);
+            const vgdData = await vgdResponse.json();
+            if (vgdData.shorturl) {
+              shortUrl = vgdData.shorturl;
+              console.log('v.gd success:', shortUrl);
+            }
+          } catch(e) {
+            console.log('v.gd failed', e);
+          }
+        }
+        
+        if (shortUrl) {
+          currentShortUrl = shortUrl;
           copyShortBtn.disabled = false;
           shrinkBtn.textContent = 'Shrink URL ✓';
-          alert('Short URL berhasil dibuat!\n' + currentShortUrl);
+          alert('Short URL berhasil dibuat!\n\n' + currentShortUrl);
           setTimeout(()=> shrinkBtn.textContent = 'Shrink URL', 2000);
-        } else if (data.errormessage) {
-          throw new Error(data.errormessage);
         } else {
-          throw new Error('Gagal membuat short URL');
+          throw new Error('Semua layanan shortener gagal. Mungkin karena CORS policy atau URL terlalu panjang.');
         }
       } catch(e) {
         console.error('Shrink URL error:', e);
-        alert('Error membuat short URL: ' + e.message + '\n\nCoba layanan lain seperti:\n- tinyurl.com\n- bit.ly');
+        alert('Error membuat short URL: ' + e.message + '\n\nAlternatif:\n1. Copy Share URL dan buka tinyurl.com atau bit.ly\n2. Paste URL di sana untuk membuat short URL manual');
         shrinkBtn.textContent = 'Shrink URL';
       } finally {
         shrinkBtn.disabled = false;
