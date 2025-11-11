@@ -1,228 +1,389 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Upload & Publish (GitHub Pages helper)</title>
-  <style>
-    body{font-family:Inter,Segoe UI,Roboto,Arial;background:#071025;color:#e6eef6;padding:20px}
-    .card{max-width:900px;margin:0 auto;background:#071A2B;padding:18px;border-radius:8px;border:1px solid rgba(255,255,255,0.03)}
-    input,button,select,textarea{padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:#e6eef6}
-    label{display:block;margin-top:12px;font-size:14px}
-    .row{display:flex;gap:8px;flex-wrap:wrap}
-    .hint{color:#9fb3c8;font-size:13px}
-    .muted{color:#7c98ab;font-size:12px}
-    button.primary{background:#06b6d4;border:none;color:#042027}
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h2>Upload file → Publish to GitHub Pages</h2>
-    <p class="hint">Pilih file, buat halaman share (opsional compress), lalu publish langsung ke repo GitHub Pages dari browser.</p>
+    <head>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width,initial-scale=1"/>
+        <title>Upload & Publish (GitHub Pages helper)</title>
+        <style>
+            body {
+                font-family: Inter,Segoe UI,Roboto,Arial;
+                background: #071025;
+                color: #e6eef6;
+                padding: 20px;
+            }
+            .card {
+                max-width: 900px;
+                margin: 0 auto;
+                background: #071A2B;
+                padding: 18px;
+                border-radius: 8px;
+                border: 1px solid rgba(255,255,255,0.03);
+            }
+            button,
+            input,
+            select,
+            textarea {
+                padding: 8px;
+                border-radius: 6px;
+                border: 1px solid rgba(255,255,255,0.06);
+                background: transparent;
+                color: #e6eef6;
+            }
+            label {
+                display: block;
+                margin-top: 12px;
+                font-size: 14px;
+            }
+            .row {
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+            .hint {
+                color: #9fb3c8;
+                font-size: 13px;
+            }
+            .muted {
+                color: #7c98ab;
+                font-size: 12px;
+            }
+            button.primary {
+                background: #06b6d4;
+                border: none;
+                color: #042027;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <h2>Upload file → Publish to GitHub Pages</h2>
+            <p class="hint">Pilih file, buat halaman share (opsional compress), lalu publish
+                langsung ke repo GitHub Pages dari browser.</p>
 
-    <label>File to publish</label>
-    <input id="fileInput" type="file" />
-    <div id="fileMeta" class="muted">No file selected</div>
+            <label>File to publish</label>
+            <input id="fileInput" type="file"/>
+            <div id="fileMeta" class="muted">No file selected</div>
 
-    <label>Share page options</label>
-    <div class="row">
-      <label style="display:flex;align-items:center;gap:8px"><input id="compressToggle" type="checkbox" /> Enable compression (creates smaller payload + runtime decompression)</label>
-      <input id="commitMessage" type="text" placeholder="Commit message (optional)" style="flex:1;min-width:220px" />
-    </div>
+            <label>Share page options</label>
+            <div class="row">
+                <label style="display:flex;align-items:center;gap:8px"><input id="compressToggle" type="checkbox"/>
+                    Enable compression (creates smaller payload + runtime decompression)</label>
+                <input
+                    id="commitMessage"
+                    type="text"
+                    placeholder="Commit message (optional)"
+                    style="flex:1;min-width:220px"/>
+            </div>
 
-    <hr style="border:none;height:1px;background:rgba(255,255,255,0.03);margin:12px 0" />
+            <hr
+                style="border:none;height:1px;background:rgba(255,255,255,0.03);margin:12px 0"/>
 
-    <h3>Publish to GitHub Pages</h3>
-    <p class="hint">You can either paste a Personal Access Token (recommended) or use OAuth with your own token-exchange endpoint (advanced).</p>
+            <h3>Publish to GitHub Pages</h3>
+            <p class="hint">You can either paste a Personal Access Token (recommended) or
+                use OAuth with your own token-exchange endpoint (advanced).</p>
 
-    <label>Owner / Repo / Branch</label>
-    <div class="row">
-      <input id="owner" placeholder="owner (username or org)" style="width:140px" />
-      <input id="repo" placeholder="repo" style="width:160px" />
-      <input id="branch" placeholder="branch (default main)" style="width:120px" />
-    </div>
+            <label>Owner / Repo / Branch</label>
+            <div class="row">
+                <input id="owner" placeholder="owner (username or org)" style="width:140px"/>
+                <input id="repo" placeholder="repo" style="width:160px"/>
+                <input id="branch" placeholder="branch (default main)" style="width:120px"/>
+            </div>
 
-    <label>Auth</label>
-    <div class="row">
-      <input id="pat" type="password" placeholder="Paste Personal Access Token (repo scope)" style="width:360px" />
-      <button id="publishBtn" class="primary">Publish</button>
-    </div>
-    <div id="publishStatus" class="muted"></div>
+            <label>Auth</label>
+            <div class="row">
+                <input
+                    id="pat"
+                    type="password"
+                    placeholder="Paste Personal Access Token (repo scope)"
+                    style="width:360px"/>
+                <button id="publishBtn" class="primary">Publish</button>
+            </div>
+            <div id="publishStatus" class="muted"></div>
 
-    <hr style="border:none;height:1px;background:rgba(255,255,255,0.03);margin:12px 0" />
+            <hr
+                style="border:none;height:1px;background:rgba(255,255,255,0.03);margin:12px 0"/>
 
-    <h3>OAuth (optional)</h3>
-    <p class="hint">If you have an OAuth app (client_id) and a server to exchange the code for a token, you can use the OAuth flow: provide client_id and (optional) token exchange endpoint. The static page cannot securely exchange code for token by itself.</p>
-    <label>OAuth client_id</label>
-    <div class="row">
-      <input id="clientId" placeholder="OAuth App client_id" style="width:260px" />
-      <input id="tokenExUrl" placeholder="Token exchange endpoint (optional)" style="width:360px" />
-      <button id="startOauth">Start OAuth</button>
-    </div>
-    <div id="oauthInfo" class="muted"></div>
+            <h3>OAuth (optional)</h3>
+            <p class="hint">If you have an OAuth app (client_id) and a server to exchange
+                the code for a token, you can use the OAuth flow: provide client_id and
+                (optional) token exchange endpoint. The static page cannot securely exchange
+                code for token by itself.</p>
+            <label>OAuth client_id</label>
+            <div class="row">
+                <input id="clientId" placeholder="OAuth App client_id" style="width:260px"/>
+                <input
+                    id="tokenExUrl"
+                    placeholder="Token exchange endpoint (optional)"
+                    style="width:360px"/>
+                <button id="startOauth">Start OAuth</button>
+            </div>
+            <div id="oauthInfo" class="muted"></div>
 
-    <hr style="border:none;height:1px;background:rgba(255,255,255,0.03);margin:12px 0" />
+            <hr
+                style="border:none;height:1px;background:rgba(255,255,255,0.03);margin:12px 0"/>
 
-    <h3>Help & token scopes</h3>
-    <p class="hint">Recommended Personal Access Token scopes:
-      <ul>
-        <li><code>repo</code> (for private repos) or <code>public_repo</code> (public only)</li>
-        <li>If you only publish to a single repo, create a token limited to that repo via fine-grained tokens.</li>
-      </ul>
-    </p>
+            <h3>Help & token scopes</h3>
+            <p class="hint">Recommended Personal Access Token scopes:
+                <ul>
+                    <li>
+                        <code>repo</code>
+                        (for private repos) or
+                        <code>public_repo</code>
+                        (public only)</li>
+                    <li>If you only publish to a single repo, create a token limited to that repo
+                        via fine-grained tokens.</li>
+                </ul>
+            </p>
 
-    <p class="muted">Notes: The page will not store your token. If you enable compression, the generated share page will include a small runtime decompressor (pako) so browsers can reconstruct the original Data URL.</p>
-  </div>
+            <p class="muted">Notes: The page will not store your token. If you enable
+                compression, the generated share page will include a small runtime decompressor
+                (pako) so browsers can reconstruct the original Data URL.</p>
+        </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
-  <script>
-    const fileInput = document.getElementById('fileInput');
-    const fileMeta = document.getElementById('fileMeta');
-    const compressToggle = document.getElementById('compressToggle');
-    const ownerInput = document.getElementById('owner');
-    const repoInput = document.getElementById('repo');
-    const branchInput = document.getElementById('branch');
-    const patInput = document.getElementById('pat');
-    const publishBtn = document.getElementById('publishBtn');
-    const publishStatus = document.getElementById('publishStatus');
-    const commitMessage = document.getElementById('commitMessage');
-    const clientIdInput = document.getElementById('clientId');
-    const tokenExInput = document.getElementById('tokenExUrl');
-    const startOauth = document.getElementById('startOauth');
-    const oauthInfo = document.getElementById('oauthInfo');
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+        <script>
+            const fileInput = document.getElementById('fileInput');
+            const fileMeta = document.getElementById('fileMeta');
+            const compressToggle = document.getElementById('compressToggle');
+            const ownerInput = document.getElementById('owner');
+            const repoInput = document.getElementById('repo');
+            const branchInput = document.getElementById('branch');
+            const patInput = document.getElementById('pat');
+            const publishBtn = document.getElementById('publishBtn');
+            const publishStatus = document.getElementById('publishStatus');
+            const commitMessage = document.getElementById('commitMessage');
+            const clientIdInput = document.getElementById('clientId');
+            const tokenExInput = document.getElementById('tokenExUrl');
+            const startOauth = document.getElementById('startOauth');
+            const oauthInfo = document.getElementById('oauthInfo');
 
-    let currentFile = null;
-    let currentDataUrl = '';
+            let currentFile = null;
+            let currentDataUrl = '';
 
-    fileInput.addEventListener('change', (e)=>{
-      const f = e.target.files && e.target.files[0];
-      if (!f) return;
-      currentFile = f;
-      fileMeta.textContent = `${f.name} • ${f.type || 'unknown'} • ${humanSize(f.size)}`;
-      const r = new FileReader();
-      r.onload = ()=>{ currentDataUrl = r.result; };
-      r.readAsDataURL(f);
-    });
+            fileInput.addEventListener('change', (e) => {
+                const f = e.target.files && e
+                    .target
+                    .files[0];
+                if (!f) 
+                    return;
+                currentFile = f;
+                fileMeta.textContent = `${f.name} • ${f.type || 'unknown'} • ${humanSize(
+                    f.size
+                )}`;
+                const r = new FileReader();
+                r.onload = () => {
+                    currentDataUrl = r.result;
+                };
+                r.readAsDataURL(f);
+            });
 
-    function humanSize(bytes){ if (!bytes) return '0 B'; if (bytes<1024) return bytes+' B'; if (bytes<1024*1024) return (bytes/1024).toFixed(1)+' KB'; return (bytes/(1024*1024)).toFixed(2)+' MB'; }
+            function humanSize(bytes) {
+                if (!bytes) 
+                    return '0 B';
+                if (bytes < 1024) 
+                    return bytes + ' B';
+                if (bytes < 1024 * 1024) 
+                    return (bytes / 1024).toFixed(1) + ' KB';
+                return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+            }
 
-    // generate share HTML; if compressed, produce compressed base64 and include pako script in page
-    function generateShareHtml(compress){
-      if (!currentDataUrl) throw new Error('No data URL');
-      const safeName = (currentFile && currentFile.name ? currentFile.name : 'shared').replace(/[^a-zA-Z0-9._-]/g,'_');
-      if (!compress) {
-        const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeName}</title></head><body>Loading...<script>try{const dataUrl=${JSON.stringify(currentDataUrl)};window.location.replace(dataUrl);}catch(e){document.body.innerHTML='<pre>'+e+'\n\nData URL:\n'+${JSON.stringify(currentDataUrl)}+'</pre>';}<\/script></body></html>`;
-        return { html, safeName };
-      } else {
-        // compress using pako.deflate -> base64
-        const str = currentDataUrl;
-        const utf8 = new TextEncoder().encode(str);
-        const def = pako.deflate(utf8);
-        // base64 encode
-        const b64 = btoa(String.fromCharCode.apply(null, Array.from(def)));
-        // share HTML includes pako and code to decode and inflate
-        const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeName}</title></head><body>Loading...<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script><script>try{const b64=${JSON.stringify(b64)};function b64ToUint8Array(b64str){const binStr = atob(b64str);const len = binStr.length;const arr = new Uint8Array(len);for(let i=0;i<len;i++)arr[i]=binStr.charCodeAt(i);return arr;}const comp = b64ToUint8Array(b64);const infl = pako.inflate(comp);const decoder = new TextDecoder();const dataUrl = decoder.decode(infl);window.location.replace(dataUrl);}catch(e){document.body.innerHTML='<pre>Error: '+e+'<\/pre>';}<\/script></body></html>`;
-        return { html, safeName };
-      }
-    }
+            // generate share HTML; if compressed, produce compressed base64 and include
+            // pako script in page
+            function generateShareHtml(compress) {
+                if (!currentDataUrl) 
+                    throw new Error('No data URL');
+                const safeName = (
+                    currentFile && currentFile.name
+                        ? currentFile.name
+                        : 'shared'
+                ).replace(/[^a-zA-Z0-9._-]/g, '_');
+                if (!compress) {
+                    const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeName}</title></head><body>Loading...<script>try{const dataUrl=${JSON.stringify(
+                        currentDataUrl
+                    )};window.location.replace(dataUrl);}catch(e){document.body.innerHTML='<pre>'+e+'\n\nData URL:\n'+${JSON.stringify(
+                        currentDataUrl
+                    )}+'</pre>';}<\/script></body></html>`;
+                    return {html, safeName};
+                } else {
+                    // compress using pako.deflate -> base64
+                    const str = currentDataUrl;
+                    const utf8 = new TextEncoder().encode(str);
+                    const def = pako.deflate(utf8);
+                    // base64 encode
+                    const b64 = btoa(String.fromCharCode.apply(null, Array.from(def)));
+                    // share HTML includes pako and code to decode and inflate
+                    const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeName}</title></head><body>Loading...<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"><\/script><script>try{const b64=${JSON.stringify(
+                        b64
+                    )};function b64ToUint8Array(b64str){const binStr = atob(b64str);const len = binStr.length;const arr = new Uint8Array(len);for(let i=0;i<len;i++)arr[i]=binStr.charCodeAt(i);return arr;}const comp = b64ToUint8Array(b64);const infl = pako.inflate(comp);const decoder = new TextDecoder();const dataUrl = decoder.decode(infl);window.location.replace(dataUrl);}catch(e){document.body.innerHTML='<pre>Error: '+e+'<\/pre>';}<\/script></body></html>`;
+                    return {html, safeName};
+                }
+            }
 
-    // Check if file exists on GitHub and get SHA if exists
-    async function githubGetFileSha(owner, repo, path, branch, token){
-      const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
-      const res = await fetch(apiUrl, { headers: token ? { Authorization: 'token '+token } : {} });
-      if (res.status === 404) return null;
-      if (!res.ok) {
-        const txt = await res.text(); throw new Error('GitHub GET error: '+res.status+' '+txt);
-      }
-      const data = await res.json();
-      return data.sha;
-    }
+            // Check if file exists on GitHub and get SHA if exists
+            async function githubGetFileSha(owner, repo, path, branch, token) {
+                const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(
+                    repo
+                )}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
+                const res = await fetch(apiUrl, {
+                    headers: token
+                        ? {
+                            Authorization: 'token ' + token
+                        }
+                        : {}
+                });
+                if (res.status === 404) 
+                    return null;
+                if (!res.ok) {
+                    const txt = await res.text();
+                    throw new Error('GitHub GET error: ' + res.status + ' ' + txt);
+                }
+                const data = await res.json();
+                return data.sha;
+            }
 
-    // Publish (create or update) file to GitHub
-    publishBtn.addEventListener('click', async ()=>{
-      try{
-        if (!currentDataUrl) return alert('Pilih file dahulu');
-        const owner = (ownerInput.value||'').trim();
-        const repo = (repoInput.value||'').trim();
-        const branch = (branchInput.value||'main').trim()||'main';
-        const token = (patInput.value||'').trim();
-        if (!owner || !repo) return alert('Isi owner dan repo');
-        if (!token) {
-          if (!confirm('Tidak ada token terpasang. Anda akan diminta memasukkan token atau menggunakan OAuth. Lanjutkan?')) return;
-        }
-        publishStatus.textContent = 'Generating share page...';
-        publishBtn.disabled = true;
-        const compress = !!compressToggle.checked;
-        const { html, safeName } = generateShareHtml(compress);
-        const path = `share-${safeName}.html`;
+            // Publish (create or update) file to GitHub
+            publishBtn.addEventListener('click', async () => {
+                try {
+                    if (!currentDataUrl) 
+                        return alert('Pilih file dahulu');
+                    const owner = (ownerInput.value || '').trim();
+                    const repo = (repoInput.value || '').trim();
+                    const branch = (branchInput.value || 'main').trim() || 'main';
+                    const token = (patInput.value || '').trim();
+                    if (!owner || !repo) 
+                        return alert('Isi owner dan repo');
+                    if (!token) {
+                        if (!confirm(
+                            'Tidak ada token terpasang. Anda akan diminta memasukkan token atau menggunakan' +
+                            ' OAuth. Lanjutkan?'
+                        )) 
+                            return;
+                        }
+                    publishStatus.textContent = 'Generating share page...';
+                    publishBtn.disabled = true;
+                    const compress = !!compressToggle.checked;
+                    const {html, safeName} = generateShareHtml(compress);
+                    const path = `share-${safeName}.html`;
 
-        // pre-check GET
-        publishStatus.textContent = 'Checking if file exists...';
-        let sha = null;
-        try{
-          sha = await githubGetFileSha(owner, repo, path, branch, token);
-        }catch(e){
-          // GET error: show but allow user to proceed
-          if (!confirm('Error checking existing file: '+e.message+'\nProceed to attempt publish?')){
-            publishBtn.disabled = false; publishStatus.textContent = 'Aborted'; return;
-          }
-        }
-        if (sha) {
-          if (!confirm('File already exists in repo (will overwrite). Continue?')){
-            publishBtn.disabled = false; publishStatus.textContent = 'Aborted by user'; return;
-          }
-        }
+                    // pre-check GET
+                    publishStatus.textContent = 'Checking if file exists...';
+                    let sha = null;
+                    try {
+                        sha = await githubGetFileSha(owner, repo, path, branch, token);
+                    } catch (e) {
+                        // GET error: show but allow user to proceed
+                        if (!confirm(
+                            'Error checking existing file: ' + e.message +
+                            '\nProceed to attempt publish?'
+                        )) {
+                            publishBtn.disabled = false;
+                            publishStatus.textContent = 'Aborted';
+                            return;
+                        }
+                    }
+                    if (sha) {
+                        if (!confirm('File already exists in repo (will overwrite). Continue?')) {
+                            publishBtn.disabled = false;
+                            publishStatus.textContent = 'Aborted by user';
+                            return;
+                        }
+                    }
 
-        // encode
-        const base64 = btoa(unescape(encodeURIComponent(html)));
-        const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURIComponent(path)}`;
-        const body = { message: commitMessage.value || `Add share page ${path}`, content: base64, branch };
-        if (sha) body.sha = sha;
-        publishStatus.textContent = 'Uploading to GitHub...';
-        const res = await fetch(apiUrl, { method: 'PUT', headers: { 'Authorization': 'token '+token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || JSON.stringify(data));
-        const ghUrl = `https://${owner}.github.io/${repo}/${path}`;
-        publishStatus.innerHTML = `Published: <a href="${ghUrl}" target="_blank" rel="noopener">${ghUrl}</a>`;
-      }catch(e){
-        console.error(e);
-        publishStatus.textContent = 'Error: '+(e.message||e);
-      }finally{ publishBtn.disabled = false; }
-    });
+                    // encode
+                    const base64 = btoa(unescape(encodeURIComponent(html)));
+                    const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(
+                        repo
+                    )}/contents/${encodeURIComponent(path)}`;
+                    const body = {
+                        message: commitMessage.value || `Add share page ${path}`,
+                        content: base64,
+                        branch
+                    };
+                    if (sha) 
+                        body.sha = sha;
+                    publishStatus.textContent = 'Uploading to GitHub...';
+                    const res = await fetch(apiUrl, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': 'token ' + token,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(body)
+                    });
+                    const data = await res.json();
+                    if (!res.ok) 
+                        throw new Error(data.message || JSON.stringify(data));
+                    const ghUrl = `https://${owner}.github.io/${repo}/${path}`;
+                    publishStatus.innerHTML = `Published: <a href="${ghUrl}" target="_blank" rel="noopener">${ghUrl}</a>`;
+                } catch (e) {
+                    console.error(e);
+                    publishStatus.textContent = 'Error: ' + (
+                        e.message || e
+                    );
+                } finally {
+                    publishBtn.disabled = false;
+                }
+            });
 
-    // OAuth start: open authorize page; requires user to register an OAuth app and supply client_id
-    startOauth.addEventListener('click', ()=>{
-      const clientId = (clientIdInput.value||'').trim();
-      if (!clientId) return alert('Masukkan client_id OAuth App Anda');
-      const state = Math.random().toString(36).slice(2);
-      localStorage.setItem('oauth_state', state);
-      const redirect = location.origin + location.pathname; // current page
-      const url = `https://github.com/login/oauth/authorize?client_id=${encodeURIComponent(clientId)}&scope=repo&state=${encodeURIComponent(state)}&redirect_uri=${encodeURIComponent(redirect)}`;
-      window.location.href = url;
-    });
+            // OAuth start: open authorize page; requires user to register an OAuth app and
+            // supply client_id
+            startOauth.addEventListener('click', () => {
+                const clientId = (clientIdInput.value || '').trim();
+                if (!clientId) 
+                    return alert('Masukkan client_id OAuth App Anda');
+                const state = Math
+                    .random()
+                    .toString(36)
+                    .slice(2);
+                localStorage.setItem('oauth_state', state);
+                const redirect = location.origin + location.pathname; // current page
+                const url = `https://github.com/login/oauth/authorize?client_id=${encodeURIComponent(
+                    clientId
+                )}&scope=repo&state=${encodeURIComponent(state)}&redirect_uri=${encodeURIComponent(
+                    redirect
+                )}`;
+                window.location.href = url;
+            });
 
-    // After redirect from OAuth, detect code and state in URL
-    (function handleOauthRedirect(){
-      const params = new URLSearchParams(location.search);
-      const code = params.get('code');
-      const state = params.get('state');
-      if (!code) return;
-      const saved = localStorage.getItem('oauth_state');
-      if (!saved || saved !== state) {
-        oauthInfo.textContent = 'OAuth returned, but state mismatch.'; return;
-      }
-      oauthInfo.textContent = 'Authorization code received. If you have a token-exchange endpoint, paste it above and click "Exchange code" there. Code shown below (copy):';
-      const pre = document.createElement('pre'); pre.textContent = code; oauthInfo.appendChild(pre);
-      // Optionally, if user provided tokenExUrl, try exchange
-      const exch = tokenExInput.value && tokenExInput.value.trim();
-      if (exch) {
-        oauthInfo.textContent += '\nAttempting token exchange...';
-        fetch(exch, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ code }) }).then(r=>r.json()).then(j=>{
-          oauthInfo.textContent = 'Exchange result: ' + JSON.stringify(j);
-        }).catch(err=>{ oauthInfo.textContent = 'Exchange failed: '+err; });
-      }
-    })();
-
-  </script>
-</body>
+            // After redirect from OAuth, detect code and state in URL
+            (function handleOauthRedirect() {
+                const params = new URLSearchParams(location.search);
+                const code = params.get('code');
+                const state = params.get('state');
+                if (!code) 
+                    return;
+                const saved = localStorage.getItem('oauth_state');
+                if (!saved || saved !== state) {
+                    oauthInfo.textContent = 'OAuth returned, but state mismatch.';
+                    return;
+                }
+                oauthInfo.textContent = 'Authorization code received. If you have a token-exchange endpoint, paste it a' +
+                        'bove and click "Exchange code" there. Code shown below (copy):';
+                const pre = document.createElement('pre');
+                pre.textContent = code;
+                oauthInfo.appendChild(pre);
+                // Optionally, if user provided tokenExUrl, try exchange
+                const exch = tokenExInput.value && tokenExInput
+                    .value
+                    .trim();
+                if (exch) {
+                    oauthInfo.textContent += '\nAttempting token exchange...';
+                    fetch(exch, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({code})
+                    })
+                        .then(r => r.json())
+                        .then(j => {
+                            oauthInfo.textContent = 'Exchange result: ' + JSON.stringify(j);
+                        })
+                        .catch(err => {
+                            oauthInfo.textContent = 'Exchange failed: ' + err;
+                        });
+                }
+            })();
+        </script>
+    </body>
 </html>
