@@ -46,7 +46,7 @@
           <strong id="drop-title">Klik atau tarik file ke sini</strong>
           <div class="small" id="drop-sub">(images, pdf, text, docs — preview terbaik untuk image & pdf)</div>
         </div>
-        <input id="fileInput" type="file" />
+        <input id="fileInput" type="file" accept="*/*" />
       </label>
     </div>
 
@@ -183,11 +183,20 @@
         img.src = dataUrl;
         img.alt = currentFileName;
         previewArea.appendChild(img);
-      } else if (mime === 'application/pdf') {
-        const embed = document.createElement('embed');
-        embed.type = 'application/pdf';
-        embed.src = dataUrl;
-        previewArea.appendChild(embed);
+      } else if (mime === 'application/pdf' || currentFileName.toLowerCase().endsWith('.pdf')) {
+        // Try iframe first (better compatibility)
+        const iframe = document.createElement('iframe');
+        iframe.src = dataUrl;
+        iframe.style.width = '100%';
+        iframe.style.height = '600px';
+        iframe.style.border = 'none';
+        iframe.style.borderRadius = '6px';
+        previewArea.appendChild(iframe);
+        
+        // Add error message if PDF doesn't load
+        iframe.onerror = function() {
+          previewArea.innerHTML = '<div class="hint">PDF tidak dapat ditampilkan di browser ini. Silakan gunakan tombol Download atau Buka di tab baru.</div>';
+        };
       } else if (mime.startsWith('text/') || mime === 'application/json' || mime.endsWith('+xml')) {
         // show text content
         // decode base64 to text
