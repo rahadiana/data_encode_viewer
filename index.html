@@ -76,9 +76,19 @@
             <button id="shrinkBtn" class="small-btn primary">Shrink URL</button>
             <button id="copyShortBtn" class="small-btn">Copy Short URL</button>
             <button id="downloadShareBtn" class="small-btn">Download Share Page</button>
-            <button id="copyGitBtn" class="small-btn">Copy Git Cmds</button>
           </div>
           <div class="hint" id="fileInfo"></div>
+        </div>
+        <div class="field" id="publishArea" style="margin-top:10px;border-top:1px dashed rgba(255,255,255,0.03);padding-top:10px;">
+          <label>Publish ke GitHub Pages (opsional)</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input id="ghOwnerInput" type="text" placeholder="owner" style="width:110px" />
+            <input id="ghRepoInput" type="text" placeholder="repo" style="width:140px" />
+            <input id="ghBranchInput" type="text" placeholder="branch (default: main)" style="width:120px" />
+            <input id="ghTokenInput" type="password" placeholder="Paste token (not stored)" style="width:220px" />
+            <button id="publishBtn" class="small-btn">Publish to GitHub Pages</button>
+          </div>
+          <div class="hint" id="publishStatus" style="margin-top:8px"></div>
         </div>
       </div>
 
@@ -123,7 +133,12 @@
   const shrinkBtn = document.getElementById('shrinkBtn');
   const copyShortBtn = document.getElementById('copyShortBtn');
   const downloadShareBtn = document.getElementById('downloadShareBtn');
-  const copyGitBtn = document.getElementById('copyGitBtn');
+  const ghOwnerInput = document.getElementById('ghOwnerInput');
+  const ghRepoInput = document.getElementById('ghRepoInput');
+  const ghBranchInput = document.getElementById('ghBranchInput');
+  const ghTokenInput = document.getElementById('ghTokenInput');
+  const publishBtn = document.getElementById('publishBtn');
+  const publishStatus = document.getElementById('publishStatus');
 
     let currentDataUrl = '';
     let currentFileName = 'file.bin';
@@ -208,7 +223,6 @@
   copyShareBtn.disabled = true;
   copyShortBtn.disabled = true;
   if (downloadShareBtn) downloadShareBtn.disabled = true;
-  if (copyGitBtn) copyGitBtn.disabled = true;
 
       // Clean up previous blob URL if exists
       if (window.currentPdfBlobUrl) {
@@ -291,7 +305,6 @@
       makeShareBtn.disabled = false;
   shrinkBtn.disabled = false;
   if (downloadShareBtn) downloadShareBtn.disabled = false;
-  if (copyGitBtn) copyGitBtn.disabled = false;
     }
 
     openBtn.addEventListener('click', ()=>{
@@ -444,15 +457,18 @@
       }
     });
 
+    // Helper: generate share HTML
+    function generateShareHtml(){
+      const safeName = (currentFileName || 'shared').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const html = `<!doctype html>\n<html lang="en">\n<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shared file</title></head>\n<body>Loading...<script>\n  try{\n    const dataUrl = ${JSON.stringify(currentDataUrl)};\n    // navigate to the data URL to display/download\n    window.location.replace(dataUrl);\n  }catch(e){\n    document.body.innerHTML = '<pre style="white-space:pre-wrap;word-break:break-word;font-family:monospace">Error opening file: '+e+"\\n\\nData URL:\\n"+${JSON.stringify(currentDataUrl)}+'</pre>';\n  }\n<\\/script></body>\n</html>`;
+      return { html, safeName };
+    }
+
     // Download a small HTML page that redirects to the data URL (useful for hosting as a static file)
     downloadShareBtn.addEventListener('click', ()=>{
       if (!currentDataUrl) return alert('Belum ada file untuk dibuat halaman share');
       try {
-        // sanitize filename
-        const safeName = (currentFileName || 'shared').replace(/[^a-zA-Z0-9._-]/g, '_');
-        const html = `<!doctype html>\n<html lang="en">\n<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shared file</title></head>\n<body>Loading...<script>\n  try{\n    const dataUrl = ${JSON.stringify(currentDataUrl)};\n    // navigate to the data URL to display/download\n    window.location.replace(dataUrl);\n  }catch(e){\n    document.body.innerHTML = '<pre style="white-space:pre-wrap;word-break:break-word;font-family:monospace">Error opening file: '+e+"\n\nData URL:\n"+${JSON.stringify(currentDataUrl)}+'</pre>';
-  }\n<\/script></body>\n</html>`;
-
+        const { html, safeName } = generateShareHtml();
         const blob = new Blob([html], {type: 'text/html'});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -467,28 +483,50 @@
       }
     });
 
-    // Copy Git commands for adding the downloaded share page to your GitHub Pages repo
-    copyGitBtn.addEventListener('click', async ()=>{
-      if (!currentDataUrl) return alert('Buat Shareable URL dahulu agar filename tersedia');
+    // Publish to GitHub Pages: client-side via GitHub REST API (user-provided token)
+    publishBtn.addEventListener('click', async ()=>{
+      if (!currentDataUrl) return alert('Belum ada file untuk dibuat halaman share');
+      const owner = (ghOwnerInput.value || '').trim();
+      const repo = (ghRepoInput.value || '').trim();
+      const token = (ghTokenInput.value || '').trim();
+      const branch = (ghBranchInput.value || 'main').trim() || 'main';
+      if (!owner || !repo || !token) return alert('Isi owner, repo, dan token GitHub (token tidak disimpan).');
+      if (!confirm('Token hanya digunakan sekali untuk meng-commit file ke repo Anda. Token tidak disimpan. Lanjutkan?')) return;
+
+      publishStatus.textContent = 'Mempublish...';
+      publishBtn.disabled = true;
       try {
-        const safeName = (currentFileName || 'shared').replace(/[^a-zA-Z0-9._-]/g, '_');
-        const filename = `share-${safeName}.html`;
-        const commands = `# From your local machine (WSL)
-# Move the downloaded file into your repo (example assumes Downloads folder)
-cp ~/Downloads/${filename} .
-# Or move the file into the repo folder using your file manager, then run:
-git add ${filename}
-git commit -m "Add shared file ${filename}"
-git push origin main
-
-# After push, GitHub Pages will serve it at:
-# https://<your-username>.github.io/<your-repo>/${filename}`;
-
-        await navigator.clipboard.writeText(commands);
-        copyGitBtn.textContent = 'Copied ✓';
-        setTimeout(()=> copyGitBtn.textContent = 'Copy Git Cmds', 2000);
+        const { html, safeName } = generateShareHtml();
+        // encode utf8 -> base64
+        const base64 = btoa(unescape(encodeURIComponent(html)));
+        const path = `share-${safeName}.html`;
+        const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURIComponent(path)}`;
+        const body = {
+          message: `Add share page ${path}`,
+          content: base64,
+          branch: branch
+        };
+        const res = await fetch(apiUrl, {
+          method: 'PUT',
+          headers: {
+            'Authorization': 'token ' + token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          console.error('GitHub API error', data);
+          throw new Error(data.message || JSON.stringify(data));
+        }
+        // Success
+        const ghUrl = `https://${owner}.github.io/${repo}/${path}`;
+        publishStatus.innerHTML = `Published: <a href="${ghUrl}" target="_blank" rel="noopener">${ghUrl}</a>`;
       } catch(e) {
-        alert('Gagal copy command: ' + e);
+        console.error('Publish error', e);
+        publishStatus.textContent = 'Error: ' + (e.message || e);
+      } finally {
+        publishBtn.disabled = false;
       }
     });
 
