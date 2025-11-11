@@ -17,9 +17,12 @@
     input[type=file]{display:none}
     .row{display:flex;gap:12px}
     .col{flex:1;min-width:0}
-    .actions{display:flex;gap:8px}
-    button{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:#e6eef6;cursor:pointer}
-    button.primary{background:linear-gradient(90deg,var(--accent),#60a5fa);border:none;color:#042027}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    button{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:#e6eef6;cursor:pointer;transition:all 0.2s}
+    button:hover:not(:disabled){background:rgba(255,255,255,0.05);transform:translateY(-1px)}
+    button:disabled{opacity:0.5;cursor:not-allowed}
+    button.primary{background:linear-gradient(90deg,var(--accent),#60a5fa);border:none;color:#042027;font-weight:500}
+    button.primary:hover:not(:disabled){box-shadow:0 4px 12px rgba(6,182,212,0.3)}
     .field{margin-top:12px}
     label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
     input[type=text], textarea{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#e6eef6;font-size:13px;box-sizing:border-box}
@@ -37,7 +40,7 @@
 </head>
 <body>
   <div class="wrap">
-    <a href="https://github.com/rahadiana/data_encode_viewer" target="_blank" rel="noopener noreferrer"><h1>Data URL / Base64 Viewer</h1></a>
+    <a href="https://github.com/rahadiana/data_encode_viewer" target="_self" rel="noopener noreferrer"><h1>Data URL / Base64 Viewer</h1></a>
     <p class="lead">Upload gambar atau file, konversi ke Data URL (base64), dan dapatkan URL yang bisa dibagikan langsung. Murni HTML + JS + CSS.</p>
 
     <div class="controls">
@@ -70,6 +73,8 @@
             <button id="downloadBtn" class="small-btn">Download</button>
             <button id="makeShareBtn" class="small-btn primary">Buat Shareable URL</button>
             <button id="copyShareBtn" class="small-btn">Copy Share URL</button>
+            <button id="shrinkBtn" class="small-btn primary">Shrink URL</button>
+            <button id="copyShortBtn" class="small-btn">Copy Short URL</button>
           </div>
           <div class="hint" id="fileInfo"></div>
         </div>
@@ -87,6 +92,7 @@
           <div class="hint">
             - Data URL bisa sangat besar untuk file besar.<br>
             - Shareable URL menyimpan Data URL di bagian fragment (hash), jadi tidak dikirim ke server.<br>
+            - <strong>Shrink URL</strong> menggunakan layanan is.gd untuk membuat link yang lebih pendek.<br>
             - Beberapa format (mis. .docx) tidak bisa ditampilkan langsung di browser — gunakan download.
           </div>
         </div>
@@ -111,11 +117,14 @@
     const downloadBtn = document.getElementById('downloadBtn');
     const makeShareBtn = document.getElementById('makeShareBtn');
     const copyShareBtn = document.getElementById('copyShareBtn');
+    const shrinkBtn = document.getElementById('shrinkBtn');
+    const copyShortBtn = document.getElementById('copyShortBtn');
 
     let currentDataUrl = '';
     let currentFileName = 'file.bin';
     let currentMime = '';
     let currentShareUrl = '';
+    let currentShortUrl = '';
 
     // Drag & Drop
     dropzone.addEventListener('click', ()=> fileInput.click());
@@ -190,7 +199,9 @@
       dataUrlField.value = dataUrl;
       base64Area.value = payload;
       currentShareUrl = ''; // invalidate until made
+      currentShortUrl = ''; // invalidate short URL too
       copyShareBtn.disabled = true;
+      copyShortBtn.disabled = true;
 
       // Clean up previous blob URL if exists
       if (window.currentPdfBlobUrl) {
@@ -271,6 +282,7 @@
       copyBaseBtn.disabled = false;
       downloadBtn.disabled = false;
       makeShareBtn.disabled = false;
+      shrinkBtn.disabled = false;
     }
 
     openBtn.addEventListener('click', ()=>{
@@ -336,6 +348,49 @@
         await navigator.clipboard.writeText(currentShareUrl);
         copyShareBtn.textContent = 'Copied ✓';
         setTimeout(()=> copyShareBtn.textContent = 'Copy Share URL', 1500);
+      } catch(e) {
+        alert('Gagal copy: ' + e);
+      }
+    });
+
+    shrinkBtn.addEventListener('click', async ()=>{
+      if (!currentShareUrl) return alert('Buat Shareable URL dahulu sebelum shrink');
+      
+      shrinkBtn.disabled = true;
+      shrinkBtn.textContent = 'Shrinking...';
+      
+      try {
+        // Use is.gd API to shorten URL
+        const apiUrl = `https://is.gd/create.php?format=json&url=${encodeURIComponent(currentShareUrl)}`;
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+        
+        if (data.shorturl) {
+          currentShortUrl = data.shorturl;
+          copyShortBtn.disabled = false;
+          shrinkBtn.textContent = 'Shrink URL ✓';
+          alert('Short URL berhasil dibuat!\n' + currentShortUrl);
+          setTimeout(()=> shrinkBtn.textContent = 'Shrink URL', 2000);
+        } else if (data.errormessage) {
+          throw new Error(data.errormessage);
+        } else {
+          throw new Error('Gagal membuat short URL');
+        }
+      } catch(e) {
+        console.error('Shrink URL error:', e);
+        alert('Error membuat short URL: ' + e.message + '\n\nCoba layanan lain seperti:\n- tinyurl.com\n- bit.ly');
+        shrinkBtn.textContent = 'Shrink URL';
+      } finally {
+        shrinkBtn.disabled = false;
+      }
+    });
+
+    copyShortBtn.addEventListener('click', async ()=>{
+      if (!currentShortUrl) return alert('Belum membuat short URL, klik "Shrink URL" dahulu');
+      try {
+        await navigator.clipboard.writeText(currentShortUrl);
+        copyShortBtn.textContent = 'Copied ✓';
+        setTimeout(()=> copyShortBtn.textContent = 'Copy Short URL', 1500);
       } catch(e) {
         alert('Gagal copy: ' + e);
       }
